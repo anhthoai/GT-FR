@@ -25,8 +25,9 @@ import org.apache.log4j.*;
 import org.json.*;
 /**
  * Servlet implementation class LogIn
+ * Supports both /LogIn and /login for case-insensitive access
  */
-@WebServlet("/LogIn")
+@WebServlet({"/LogIn", "/login"})
 public class LogIn extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	public static Logger m_logger = Logger.getLogger(MySQLConfig.class);

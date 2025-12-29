@@ -1,0 +1,57 @@
+# CloudPanel Nginx Configuration for GT-FR Server
+# Add this to your CloudPanel site's Nginx configuration
+
+# Step 1: Add upstream block (usually in http block or site config)
+upstream tomcat_backend {
+    server 127.0.0.1:8080;
+    keepalive 32;
+}
+
+# Step 2: Add location block inside your server block
+location /FRServer/ {
+    # Remove trailing slash handling
+    rewrite ^/FRServer$ /FRServer/ permanent;
+    
+    # Proxy to Tomcat
+    proxy_pass http://tomcat_backend/FRServer/;
+    proxy_http_version 1.1;
+    
+    # Essential headers
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port $server_port;
+    proxy_set_header Connection "";
+    
+    # Disable buffering for better performance
+    proxy_buffering off;
+    
+    # Timeouts
+    proxy_connect_timeout 60s;
+    proxy_send_timeout 60s;
+    proxy_read_timeout 60s;
+    
+    # Don't follow redirects
+    proxy_redirect off;
+}
+
+# Step 3: Handle case-insensitive login URLs (IMPORTANT!)
+location ~* ^/FRServer/(login|Login|LOGIN)$ {
+    rewrite ^/FRServer/(.*)$ /FRServer/LogIn permanent;
+}
+
+# Step 4: Serve static files efficiently
+location ~* ^/FRServer/(assets|externalexec)/ {
+    proxy_pass http://tomcat_backend;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    
+    # Cache static files
+    expires 30d;
+    add_header Cache-Control "public, immutable";
+}
+
