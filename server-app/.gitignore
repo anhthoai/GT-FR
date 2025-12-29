@@ -30,10 +30,8 @@ WebContent/data/
 WebContent/historyimgs/
 WebContent/personimgs/
 
-# Large binary files (download separately - see README)
-WebContent/externalexec/model/*.bin
-WebContent/externalexec/*.dll
-WebContent/externalexec/*.exe
+# Note: Large binary files (.bin, .dll, .exe) are now tracked via Git LFS
+# See .gitattributes in root directory
 
 # Temporary files
 *.tmp

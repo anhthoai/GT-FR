@@ -1,2 +1,18 @@
-# Git LFS is not used - large files are excluded and downloaded separately
-# See README.md for download instructions
+# Git LFS tracking for large binary files
+# Track files that exceed GitHub's 50MB recommendation
+
+# Large model files (89MB+)
+*.bin filter=lfs diff=lfs merge=lfs -text
+
+# Large Windows DLLs (70MB+)
+*.dll filter=lfs diff=lfs merge=lfs -text
+
+# Large executables
+*.exe filter=lfs diff=lfs merge=lfs -text
+
+# Note: .jar files are NOT tracked in LFS as they are dependencies
+# that should be managed via build tools (Maven/Gradle)
+
+# Exclude Debug folders from LFS (already in .gitignore, but explicit here)
+window-app/bin/Debug/** -filter -diff -merge
+window-app/bin/Debug/** linguist-generated=true
