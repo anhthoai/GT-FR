@@ -15,6 +15,11 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Base64;
 import java.sql.Blob;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -27,17 +32,14 @@ import java.util.Iterator;
 import java.util.List;
 
 import javax.imageio.ImageIO;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
-
-import org.apache.tomcat.util.codec.binary.Base64;
 import org.json.JSONObject;
 
 import com.mysql.jdbc.Driver;
@@ -50,6 +52,7 @@ import ucf.fdrssutil.globalUtil;
  * General Photo Upload
  */
 @WebServlet("/UpdateDatabase")
+@MultipartConfig
 public class UpdateDatabase extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	private String m_rootDir, m_fileDir;
@@ -105,54 +108,44 @@ public class UpdateDatabase extends HttpServlet {
 		String image_path=historyimgdir + "/" + access_date + "/";
 		
 		PrintWriter out = response.getWriter();
-		
-		DiskFileItemFactory factory = new DiskFileItemFactory();
-	    // maximum size that will be stored in memory
-		factory.setSizeThreshold(m_maxMemSize);
-		// Location to save data that is larger than maxMemSize.
-		factory.setRepository(new File(image_path));
-		// Create a new file upload handler
-		ServletFileUpload upload = new ServletFileUpload(factory);
-		// maximum file size to be uploaded.
-		upload.setSizeMax( m_maxFileSize );
-	      try{ 
-		      // Parse the request to get file items.
-		      List<FileItem> fileItems = upload.parseRequest(request);
-		      // Process the uploaded file items
-		      Iterator<FileItem> i = fileItems.iterator();
-		      int n = 0;
-		      while ( i.hasNext () ) 
-		      {
-		         FileItem fi = (FileItem)i.next();
-		         if ( !fi.isFormField ())
-		         {
-		        	 File f = new File( image_path + "temp.jpg");
-		        	 fi.write( f );
-		        	 
-		        	 if (n == 0)
-		        		 m_file = new File( image_path + alarm_id + "_" + access_time + "_" + adminid + "_recognized.encode");
-		        	 else if (n == 1)
-		        		 m_file = new File( image_path + alarm_id + "_" + access_time + "_" + adminid + "_full.encode");
-		        	 
-		        	 String encoded_string = encodeFileToBase64Binary(f);
-		    		try {
-		                FileWriter fw = new FileWriter(m_file);
-		                fw.write(encoded_string);
-		                fw.close();
 
-		            } catch (IOException iox) {
-		                //do stuff with exception
-		                iox.printStackTrace();
-		            }
-			    		
-		        	 n++;
-		         }
-		      }
-		   }catch(Exception ex) {
-			   String strJson = "{result : fail}";
-			   JSONObject obj = new JSONObject(strJson);
-			   out.print(obj);
-		   }
+		try {
+			File dir = new File(image_path);
+			if (!dir.exists()) dir.mkdirs();
+
+			int n = 0;
+			Path tempJpg = Paths.get(image_path, "temp.jpg");
+
+			for (Part part : request.getParts()) {
+				String submitted = part.getSubmittedFileName();
+				if (submitted == null || submitted.isEmpty() || part.getSize() <= 0) continue;
+				if (part.getSize() > m_maxFileSize) throw new IllegalArgumentException("File too large");
+
+				// Save to temp.jpg then convert to base64
+				try (InputStream is = part.getInputStream()) {
+					Files.copy(is, tempJpg, StandardCopyOption.REPLACE_EXISTING);
+				}
+				File f = tempJpg.toFile();
+
+				if (n == 0)
+					m_file = new File(image_path + alarm_id + "_" + access_time + "_" + adminid + "_recognized.encode");
+				else if (n == 1)
+					m_file = new File(image_path + alarm_id + "_" + access_time + "_" + adminid + "_full.encode");
+				else
+					break;
+
+				String encoded_string = encodeFileToBase64Binary(f);
+				try (FileWriter fw = new FileWriter(m_file)) {
+					fw.write(encoded_string);
+				}
+
+				n++;
+			}
+		} catch (Exception ex) {
+			String strJson = "{result : fail}";
+			JSONObject obj = new JSONObject(strJson);
+			out.print(obj);
+		}
 
 		String json_str="";
 		PreparedStatement pstmt;
@@ -230,7 +223,7 @@ public class UpdateDatabase extends HttpServlet {
              FileInputStream fileInputStreamReader = new FileInputStream(file);
              byte[] bytes = new byte[(int)file.length()];
              fileInputStreamReader.read(bytes);
-             encodedfile = new String(Base64.encodeBase64(bytes), "UTF-8");
+             encodedfile = Base64.getEncoder().encodeToString(bytes);
          } catch (FileNotFoundException e) {
              // TODO Auto-generated catch block
              e.printStackTrace();

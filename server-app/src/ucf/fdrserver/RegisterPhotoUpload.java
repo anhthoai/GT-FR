@@ -7,20 +7,24 @@ import java.awt.image.AffineTransformOp;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import javax.imageio.ImageIO;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.json.JSONObject;
 
 import com.drew.imaging.ImageMetadataReader;
@@ -39,6 +43,7 @@ import ucf.fdrssutil.globalUtil;
  * General Photo Upload
  */
 @WebServlet("/RegisterPhotoUpload")
+@MultipartConfig
 public class RegisterPhotoUpload extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	private String m_rootDir, m_fileDir, m_tempDir, m_exePath;
@@ -104,34 +109,27 @@ public class RegisterPhotoUpload extends HttpServlet {
 		else{
 			//globalUtil.delFolderContent(filePath);
 		}
-		java.io.PrintWriter out = response.getWriter( );
-		DiskFileItemFactory factory = new DiskFileItemFactory();
-	    // maximum size that will be stored in memory
-		factory.setSizeThreshold(m_maxMemSize);
-		// Location to save data that is larger than maxMemSize.
-		factory.setRepository(new File(tempDir));
-		// Create a new file upload handler
-		ServletFileUpload upload = new ServletFileUpload(factory);
-		// maximum file size to be uploaded.
-		upload.setSizeMax( m_maxFileSize );
-	      try{ 
-		      // Parse the request to get file items.
-		      List<FileItem> fileItems = upload.parseRequest(request);
-		      // Process the uploaded file items
-		      Iterator<FileItem> i = fileItems.iterator();
-		      int n = 0;
-		      while ( i.hasNext () ) 
-		      {
-		         FileItem fi = (FileItem)i.next();
-		         if ( !fi.isFormField () )
-		         {
-		            // Write the file
-                    m_file = new File( filePath + outfn);
-		            
-		            fi.write( m_file );
-		            n++;
-		            
-		            File upload_file = new File(filePath + outfn);
+		java.io.PrintWriter out = response.getWriter();
+		try {
+			int n = 0;
+			for (Part part : request.getParts()) {
+				String submitted = part.getSubmittedFileName();
+				if (submitted == null || submitted.isEmpty() || part.getSize() <= 0) continue;
+				if (part.getSize() > m_maxFileSize) {
+					throw new IllegalArgumentException("File too large");
+				}
+
+				// Only handle the first uploaded file (matches old behavior)
+				if (n > 0) break;
+
+				Path target = Paths.get(filePath, outfn);
+				try (InputStream is = part.getInputStream()) {
+					Files.copy(is, target, StandardCopyOption.REPLACE_EXISTING);
+				}
+				m_file = target.toFile();
+				n++;
+
+				File upload_file = target.toFile();
 		            try{         	
 		            	ImageInformation info = readImageInformation(upload_file);
 		            	if (info.orientation!=1){
@@ -167,8 +165,7 @@ public class RegisterPhotoUpload extends HttpServlet {
 	                		globalUtil.CopyFile(filePath+outfn, filePath+resizefn);
 	                }
 
-		         }
-		      }
+			}
 		      if (n>0){
 		    	  String strJson = "{file_id:"+file_id+",scale:"+sc+",width:"+w+",height:"+h+"}";
 				  JSONObject obj = new JSONObject(strJson);
@@ -184,7 +181,7 @@ public class RegisterPhotoUpload extends HttpServlet {
 					  out.print(obj);
 		    	  }
 		      }
-	   }catch(Exception ex) {
+	   } catch(Exception ex) {
 		   if( deviceID == 0 )
 			   out.print("error");
 		   else{

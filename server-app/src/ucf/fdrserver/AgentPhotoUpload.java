@@ -9,20 +9,24 @@ import java.awt.image.BufferedImage;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.sql.PreparedStatement;
 import java.util.Iterator;
 import java.util.List;
 
 import javax.imageio.ImageIO;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
 import org.json.JSONObject;
 
 import com.mysql.jdbc.MySQLConnection;
@@ -33,6 +37,7 @@ import ucf.fdrssutil.globalUtil;
  * General Photo Upload
  */
 @WebServlet("/AgentPhotoUpload")
+@MultipartConfig
 public class AgentPhotoUpload extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	private String m_rootDir, m_fileDir, m_tempDir, m_exePath;
@@ -73,31 +78,21 @@ public class AgentPhotoUpload extends HttpServlet {
 		if (!f.exists())  f.mkdirs();
 		image_path = fileDir+"/"+adminid+".jpg";
 		
-		java.io.PrintWriter out = response.getWriter( );
-		DiskFileItemFactory factory = new DiskFileItemFactory();
-		// maximum size that will be stored in memory
-		factory.setSizeThreshold(m_maxMemSize);
-		// Location to save data that is larger than maxMemSize.
-		factory.setRepository(new File(fileDir));
-		// Create a new file upload handler
-		ServletFileUpload upload = new ServletFileUpload(factory);
-		// maximum file size to be uploaded.
-		upload.setSizeMax(m_maxFileSize);
-		try{ 
-			// Parse the request to get file items.
-			List<FileItem> fileItems = upload.parseRequest(request);
-			// Process the uploaded file items
-			Iterator<FileItem> i = fileItems.iterator();
+		java.io.PrintWriter out = response.getWriter();
+		try {
 			int n = 0;
-			while ( i.hasNext () ) 
-			{
-				FileItem fi = (FileItem)i.next();
-				if ( !fi.isFormField () )
-				{
-					m_file = new File(image_path);
-					fi.write( m_file );
-					n++;
+			for (Part part : request.getParts()) {
+				String submitted = part.getSubmittedFileName();
+				if (submitted == null || submitted.isEmpty() || part.getSize() <= 0) continue;
+				if (part.getSize() > m_maxFileSize) throw new IllegalArgumentException("File too large");
+				if (n > 0) break; // only first file
+
+				Path target = Paths.get(image_path);
+				try (InputStream is = part.getInputStream()) {
+					Files.copy(is, target, StandardCopyOption.REPLACE_EXISTING);
 				}
+				m_file = target.toFile();
+				n++;
 			}
 			if (n>0){
 				//save register data to db
@@ -139,7 +134,7 @@ public class AgentPhotoUpload extends HttpServlet {
 				JSONObject obj = new JSONObject(strJson);
 				out.print(obj);
 			}
-		}catch(Exception ex) {
+		} catch(Exception ex) {
 			String strJson = "{result:fail}";
 			JSONObject obj = new JSONObject(strJson);
 			out.print(obj);

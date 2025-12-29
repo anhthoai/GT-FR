@@ -17,19 +17,15 @@ import java.text.Format;
 import java.text.SimpleDateFormat;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Base64;
 
 import javax.imageio.ImageIO;
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.WebServlet;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
-import org.apache.commons.fileupload.FileItem;
-import org.apache.commons.fileupload.disk.DiskFileItemFactory;
-import org.apache.commons.fileupload.servlet.ServletFileUpload;
-
-import org.apache.tomcat.util.codec.binary.Base64;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.format.DateTimeFormat;
@@ -39,7 +35,6 @@ import org.json.JSONObject;
 import com.mysql.jdbc.Driver;
 import com.mysql.jdbc.MySQLConnection;
 
-import sun.misc.BASE64Decoder;
 import ucf.firebase.FirebaseResponse;
 import ucf.firebase.Notification;
 import ucf.firebase.PushNotifHelper;
@@ -221,8 +216,9 @@ public class SaveToDatabase extends HttpServlet {
 				        line = br.readLine();
 				    }
 				    String everything = sb.toString();
-				    BASE64Decoder decoder = new BASE64Decoder();
-					byte[] imageByte = decoder.decodeBuffer(everything);
+				    // remove whitespace/newlines before decoding
+				    String sanitized = everything.replaceAll("\\s+", "");
+					byte[] imageByte = Base64.getDecoder().decode(sanitized);
 					//if (!img_f.exists()){
 						DataOutputStream dos = globalUtil.getOutputStream(image_path + "/temp.jpg");
 						dos.write(imageByte);
@@ -342,7 +338,7 @@ public class SaveToDatabase extends HttpServlet {
              FileInputStream fileInputStreamReader = new FileInputStream(file);
              byte[] bytes = new byte[(int)file.length()];
              fileInputStreamReader.read(bytes);
-             encodedfile = new String(Base64.encodeBase64(bytes), "UTF-8");
+             encodedfile = Base64.getEncoder().encodeToString(bytes);
          } catch (FileNotFoundException e) {
              // TODO Auto-generated catch block
              e.printStackTrace();
