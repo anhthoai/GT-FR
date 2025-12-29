@@ -1,0 +1,18 @@
+# App-specific build files
+/build
+/release
+/gen
+/bin
+
+# App bundle and APK files
+*.apk
+*.aab
+
+# Proguard files
+proguard/
+
+# Lint files
+lint/
+
+# Test results
+test-results/

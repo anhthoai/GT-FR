@@ -1,0 +1,110 @@
+/* here you can put your own css to customize and override the theme */
+.comdiv{
+	border-bottom: 1px solid #ffffff;
+	margin-top:0px;
+	cursor:pointer;
+	background-color: #3d3d3d;
+}
+.resultdiv{
+	border-bottom: 1px solid #ffffff;
+	margin-top:0px;
+	cursor:pointer;
+	background-color: #3d3d3d;
+}
+#resultdiv_1
+{
+	margin-top:10px !important;
+}
+.comname{
+	color: #fff;
+	font-size: 16px;
+	margin:0px;
+	
+}
+.res_back{
+	width:30px !important;
+	height:30px !important;
+	margin-top:0px !important;
+	margin-right:10px !important;
+	margin-left:5px !important;
+}
+
+.resultname{
+	color: #fff;
+	font-size: 16px;
+	margin:0px;
+	
+}
+.delete_td{
+	margin:5px;
+}
+.view_td{
+	margin:5px;
+}
+.edit_td{
+	margin:5px;
+	margin-left:20px;
+}
+#logoimg
+{
+	margin-left:20px;
+	margin-top:10px;	
+}
+#search_photo
+{
+	width:196px;
+	height:196px;
+}
+#close_btn
+{
+	position:absolute;
+	left:15px;
+	top:0px;
+}
+#create_account_close_btn
+{
+	position:absolute;
+	left:15px;
+	top:0px;
+}
+
+#search_img_panel
+{
+	cursor:pointer;
+}
+#view_img
+{
+	width:240px;
+}
+.res_face
+{
+	width:60px;
+	height:auto;
+}
+.jcrop-keymgr{
+	width:0px !important;
+}
+#scan_lab{
+	position:absolute;
+	left:42%;
+	top:25%;
+	font-size:30px;
+	color: #fff !important;
+}
+#get_mobile
+{
+	cursor:pointer;
+}
+#face_img
+{
+	width:400px;
+	height:auto;
+}
+
+#tab_1_5
+{
+	margin-top: 5px !important;
+}
+#btn_videoesc{
+	margin-top:27px !important;
+}

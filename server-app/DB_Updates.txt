@@ -1,0 +1,6 @@
+ALTER TABLE person_info
+ADD COLUMN group_name TEXT NULL;
+ALTER TABLE alarm_info
+ADD COLUMN group_name TEXT NULL;
+ALTER TABLE device_lists
+ADD COLUMN adminid TEXT NULL;

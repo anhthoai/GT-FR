@@ -1,0 +1,78 @@
+﻿################################################################################
+# Windows Application .gitignore
+# Visual Studio and build artifacts
+################################################################################
+
+# Visual Studio files
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+
+# Build output directories
+bin/
+obj/
+x64/
+x86/
+Debug/
+Release/
+Release_GPU/
+*.pdb
+*.iobj
+*.ipdb
+*.ilk
+*.exp
+*.lib
+*.dll
+*.exe
+
+# Visual Studio cache/options
+.vs/
+.vscode/
+*.VC.db
+*.VC.VC.opendb
+
+# Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+*.bak
+*.swp
+*~
+*.suo
+*.user
+*.sdf
+*.opensdf
+*.db
+*.opendb
+
+# Model files (large binary files - uncomment if you don't want to track them)
+# bin/*/model/*.bin
+# bin/*/model/*.xml
+
+# Configuration files with sensitive data
+config.txt
+feature.txt
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini

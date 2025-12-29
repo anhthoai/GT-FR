@@ -1,0 +1,50 @@
+# Server Application .gitignore
+
+# Eclipse IDE files
+.settings/
+.project
+.classpath
+.metadata/
+*.launch
+*.pydevproject
+
+# Build output
+build/
+classes/
+bin/
+*.class
+
+# Log files
+*.log
+logs/
+WEB-INF/*.log
+
+# Sensitive configuration files (DO NOT COMMIT)
+FaceRecognition-966aee651648.json
+WebContent/FaceRecognition-966aee651648.json
+user_config.txt
+WebContent/user_config.txt
+
+# Application data directories
+WebContent/data/
+WebContent/historyimgs/
+WebContent/personimgs/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.cache
+
+# JAR dependencies (should be managed by build system)
+# Uncomment if you want to ignore JAR files
+# lib/*.jar
+# WebContent/WEB-INF/lib/*.jar
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Compiled servlets
+*.jsp.class
+

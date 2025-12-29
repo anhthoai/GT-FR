@@ -1,0 +1,16 @@
+<ie>
+    <plugins>
+        <plugin name="GNA" location="GNAPlugin.dll">
+        </plugin>
+        <plugin name="HDDL" location="HDDLPlugin.dll">
+        </plugin>
+        <plugin name="CPU" location="MKLDNNPlugin.dll">
+        </plugin>
+        <plugin name="GPU" location="clDNNPlugin.dll">
+        </plugin>
+        <plugin name="FPGA" location="dliaPlugin.dll">
+        </plugin>
+        <plugin name="MYRIAD" location="myriadPlugin.dll">
+        </plugin>
+    </plugins>
+</ie>
