@@ -63,9 +63,9 @@ bld/
 *.db
 *.opendb
 
-# Model files (large binary files - uncomment if you don't want to track them)
-# bin/*/model/*.bin
-# bin/*/model/*.xml
+# Model files (large binary files - download separately)
+bin/*/model/*.bin
+bin/*/model/*.xml
 
 # Configuration files with sensitive data
 config.txt

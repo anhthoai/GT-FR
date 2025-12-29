@@ -356,6 +356,32 @@ password=your_password
 
 ---
 
+## Large Binary Files
+
+**Important:** Large binary files (model files, DLLs) are excluded from this repository to avoid GitHub's file size limitations. These files must be downloaded separately.
+
+### Quick Setup
+
+1. **Server Application:**
+   - Download face recognition model files and place in `server-app/WebContent/externalexec/model/`
+   - Download `opencv_world410.dll` and place in `server-app/WebContent/externalexec/`
+
+2. **Windows Application:**
+   - Download model files and place in `window-app/bin/Release/model/` or `window-app/bin/Debug/model/`
+   - Download required DLLs (OpenCV, Intel Inference Engine) to the appropriate `bin/` directory
+
+### Detailed Instructions
+
+See **[download-large-files.md](download-large-files.md)** for:
+- Complete list of required files
+- Download links (to be configured)
+- Setup scripts
+- File integrity verification
+
+**Note:** You'll need to host these files separately (Google Drive, Dropbox, your own server, etc.) and update the download links in `download-large-files.md`.
+
+---
+
 ## Database Updates
 
 See `server-app/DB_Updates.txt` for database schema updates:

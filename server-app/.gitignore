@@ -30,6 +30,11 @@ WebContent/data/
 WebContent/historyimgs/
 WebContent/personimgs/
 
+# Large binary files (download separately - see README)
+WebContent/externalexec/model/*.bin
+WebContent/externalexec/*.dll
+WebContent/externalexec/*.exe
+
 # Temporary files
 *.tmp
 *.temp
