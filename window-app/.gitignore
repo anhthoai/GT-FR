@@ -63,10 +63,9 @@ bld/
 *.db
 *.opendb
 
-# Model files (large binary files - tracked via Git LFS)
-# Note: bin/ directory is still ignored, but model files in repo are tracked via LFS
-# bin/*/model/*.bin
-# bin/*/model/*.xml
+# Model files (large binary files - download separately)
+bin/*/model/*.bin
+bin/*/model/*.xml
 
 # Configuration files with sensitive data
 config.txt
