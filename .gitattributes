@@ -1,4 +1,14 @@
+# Git LFS tracking for large binary files
+# Only track files that exceed GitHub's 50MB recommendation
+
+# Large model files (89MB+)
 *.bin filter=lfs diff=lfs merge=lfs -text
+
+# Large Windows DLLs (70MB+)
 *.dll filter=lfs diff=lfs merge=lfs -text
+
+# Large executables (if any)
 *.exe filter=lfs diff=lfs merge=lfs -text
-*.jar filter=lfs diff=lfs merge=lfs -text
+
+# Note: .jar files are excluded from LFS as they are dependencies
+# that should be managed via build tools (Maven/Gradle) or downloaded separately
