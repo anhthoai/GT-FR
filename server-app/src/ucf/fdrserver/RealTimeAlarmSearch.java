@@ -200,7 +200,8 @@ public class RealTimeAlarmSearch extends HttpServlet {
 				String query = "select * from users_info where userid='"+userid+"'";
 				Statement stmt = con.createStatement();
 				ResultSet rs = stmt.executeQuery(query);
-				if (!rs.first())
+				// Connector/J 8 default ResultSet is TYPE_FORWARD_ONLY -> use next() not first()
+				if (!rs.next())
 				{
 					out.print("fail");
 					return;

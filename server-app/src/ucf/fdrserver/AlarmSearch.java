@@ -133,8 +133,9 @@ public class AlarmSearch extends HttpServlet {
 		}
 		String home= (String) request.getParameter("home");
 		if(home!=null){
-			if(sql!="") sql+=" AND home like '%"+home+"%'";
-			else sql="home like '%"+home+"%'";
+			// alarm_info column is home_address (not home)
+			if(sql!="") sql+=" AND home_address like '%"+home+"%'";
+			else sql="home_address like '%"+home+"%'";
 		}
 		String email= (String) request.getParameter("email");
 		if(email!=null){
@@ -202,7 +203,8 @@ public class AlarmSearch extends HttpServlet {
 				String query = "select * from users_info where userid='"+userid+"'";
 				Statement stmt = con.createStatement();
 				ResultSet rs = stmt.executeQuery(query);
-				if (!rs.first())
+				// Connector/J 8 default ResultSet is TYPE_FORWARD_ONLY -> use next() not first()
+				if (!rs.next())
 				{
 					out.print("fail");
 					return;
