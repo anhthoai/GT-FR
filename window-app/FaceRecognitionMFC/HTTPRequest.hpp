@@ -31,8 +31,10 @@ using namespace std;
 #  endif
 #  include <winsock2.h>
 #  include <ws2tcpip.h>
+#  include <winhttp.h>
 #  pragma pop_macro("WIN32_LEAN_AND_MEAN")
 #  pragma pop_macro("NOMINMAX")
+#  pragma comment(lib, "winhttp.lib")
 #else
 #  include <sys/socket.h>
 #  include <netinet/in.h>
@@ -344,7 +346,10 @@ namespace http
                 domain.resize(portPosition);
             }
             else
-                port = "80";
+            {
+                // Default ports based on scheme
+                port = (scheme == "https") ? "443" : "80";
+            }
         }
 
         Response send(const std::string& method,
@@ -371,6 +376,147 @@ namespace http
         {
             Response response;
 
+#ifdef _WIN32
+            // On Windows, support both HTTP and HTTPS (TLS) using WinHTTP.
+            if (scheme != "http" && scheme != "https")
+                throw std::runtime_error("Only HTTP/HTTPS schemes are supported");
+
+            auto toWide = [](const std::string& s) -> std::wstring {
+                if (s.empty()) return L"";
+                const int needed = MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, nullptr, 0);
+                if (needed <= 0) return L"";
+                std::wstring out(static_cast<size_t>(needed - 1), L'\0');
+                MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, &out[0], needed);
+                return out;
+            };
+
+            const INTERNET_PORT iPort = static_cast<INTERNET_PORT>(std::stoi(port));
+            const bool secure = (scheme == "https");
+
+            HINTERNET hSession = WinHttpOpen(L"GT-FR/WinHTTP",
+                                            WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                                            WINHTTP_NO_PROXY_NAME,
+                                            WINHTTP_NO_PROXY_BYPASS,
+                                            0);
+            if (!hSession)
+                throw std::runtime_error("WinHttpOpen failed");
+
+            // Avoid hanging UI forever
+            WinHttpSetTimeouts(hSession, 10000, 10000, 20000, 20000);
+
+            const std::wstring wDomain = toWide(domain);
+            HINTERNET hConnect = WinHttpConnect(hSession, wDomain.c_str(), iPort, 0);
+            if (!hConnect) {
+                WinHttpCloseHandle(hSession);
+                throw std::runtime_error("WinHttpConnect failed");
+            }
+
+            const std::wstring wMethod = toWide(method);
+            const std::wstring wPath = toWide(path);
+            const DWORD reqFlags = secure ? WINHTTP_FLAG_SECURE : 0;
+
+            HINTERNET hRequest = WinHttpOpenRequest(
+                hConnect,
+                wMethod.c_str(),
+                wPath.c_str(),
+                nullptr,
+                WINHTTP_NO_REFERER,
+                WINHTTP_DEFAULT_ACCEPT_TYPES,
+                reqFlags
+            );
+
+            if (!hRequest) {
+                WinHttpCloseHandle(hConnect);
+                WinHttpCloseHandle(hSession);
+                throw std::runtime_error("WinHttpOpenRequest failed");
+            }
+
+            // Add caller-provided headers
+            for (const auto& h : headers) {
+                const std::wstring wh = toWide(h);
+                if (!wh.empty())
+                    WinHttpAddRequestHeaders(hRequest, wh.c_str(), (ULONG)-1L, WINHTTP_ADDREQ_FLAG_ADD);
+            }
+
+            const DWORD bodyLen = static_cast<DWORD>(body.size());
+            BOOL ok = WinHttpSendRequest(
+                hRequest,
+                WINHTTP_NO_ADDITIONAL_HEADERS,
+                0,
+                bodyLen ? (LPVOID)body.data() : WINHTTP_NO_REQUEST_DATA,
+                bodyLen,
+                bodyLen,
+                0
+            );
+
+            if (!ok) {
+                WinHttpCloseHandle(hRequest);
+                WinHttpCloseHandle(hConnect);
+                WinHttpCloseHandle(hSession);
+                throw std::runtime_error("WinHttpSendRequest failed");
+            }
+
+            ok = WinHttpReceiveResponse(hRequest, nullptr);
+            if (!ok) {
+                WinHttpCloseHandle(hRequest);
+                WinHttpCloseHandle(hConnect);
+                WinHttpCloseHandle(hSession);
+                throw std::runtime_error("WinHttpReceiveResponse failed");
+            }
+
+            // Status code
+            DWORD statusCode = 0;
+            DWORD statusCodeSize = sizeof(statusCode);
+            const DWORD statusCodeType = WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER;
+            if (WinHttpQueryHeaders(hRequest, statusCodeType, WINHTTP_HEADER_NAME_BY_INDEX,
+                                    &statusCode, &statusCodeSize, WINHTTP_NO_HEADER_INDEX)) {
+                response.status = static_cast<int>(statusCode);
+            }
+
+            // Raw headers
+            DWORD headerSize = 0;
+            WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX,
+                                nullptr, &headerSize, WINHTTP_NO_HEADER_INDEX);
+            if (GetLastError() == ERROR_INSUFFICIENT_BUFFER && headerSize > 0) {
+                std::wstring raw;
+                raw.resize(headerSize / sizeof(wchar_t));
+                if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX,
+                                        &raw[0], &headerSize, WINHTTP_NO_HEADER_INDEX)) {
+                    // Convert headers to UTF-8 and split by CRLF
+                    const int need = WideCharToMultiByte(CP_UTF8, 0, raw.c_str(), -1, nullptr, 0, nullptr, nullptr);
+                    if (need > 0) {
+                        std::string rawUtf8(static_cast<size_t>(need - 1), '\0');
+                        WideCharToMultiByte(CP_UTF8, 0, raw.c_str(), -1, &rawUtf8[0], need, nullptr, nullptr);
+                        size_t start = 0;
+                        while (true) {
+                            const size_t end = rawUtf8.find("\r\n", start);
+                            if (end == std::string::npos) break;
+                            const std::string line = rawUtf8.substr(start, end - start);
+                            if (!line.empty()) response.headers.push_back(line);
+                            start = end + 2;
+                        }
+                    }
+                }
+            }
+
+            // Body
+            for (;;) {
+                DWORD avail = 0;
+                if (!WinHttpQueryDataAvailable(hRequest, &avail)) break;
+                if (avail == 0) break;
+                const size_t oldSize = response.body.size();
+                response.body.resize(oldSize + avail);
+                DWORD read = 0;
+                if (!WinHttpReadData(hRequest, response.body.data() + oldSize, avail, &read)) break;
+                if (read < avail) response.body.resize(oldSize + read);
+            }
+
+            WinHttpCloseHandle(hRequest);
+            WinHttpCloseHandle(hConnect);
+            WinHttpCloseHandle(hSession);
+
+            return response;
+#else
             if (scheme != "http")
                 throw std::runtime_error("Only HTTP scheme is supported");
 
@@ -594,6 +740,7 @@ namespace http
             }
 
             return response;
+#endif
         }
 
     private:
