@@ -19,8 +19,7 @@ import jakarta.servlet.http.HttpSession;
 
 import org.json.JSONObject;
 
-import com.mysql.jdbc.MySQLConnection;
-
+import java.sql.Connection;
 import ucf.fdrssutil.MySQLConfig;
 import ucf.fdrssutil.globalUtil;
 
@@ -33,7 +32,7 @@ public class AgentEdit extends HttpServlet {
 
 	byte[] src_imgbytes;
 
-	private MySQLConnection con;
+	private Connection con;
 	public AgentEdit() {
         super();       
     }

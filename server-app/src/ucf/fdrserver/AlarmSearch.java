@@ -32,12 +32,9 @@ import jakarta.servlet.http.HttpSession;
 
 import org.json.JSONObject;
 
-import com.mysql.jdbc.CommunicationsException;
-import com.mysql.jdbc.MySQLConnection;
+import java.sql.Connection;
 import java.sql.Timestamp;
 
-
-import com.mysql.jdbc.exceptions.jdbc4.MySQLSyntaxErrorException;
 
 import ucf.fdrssutil.MySQLConfig;
 import ucf.fdrssutil.globalUtil;
@@ -54,7 +51,7 @@ import sun.misc.BASE64Decoder;
 @WebServlet("/AlarmSearch")
 public class AlarmSearch extends HttpServlet {
 	private static final long serialVersionUID = 1L;
-	private MySQLConnection  con;
+	private Connection  con;
 	Format formatter = new SimpleDateFormat("yyyy-MM-dd");
 	Format formatter1 = new SimpleDateFormat("yyyy-MM-dd hh-mm-ss");
 	String image_path="";

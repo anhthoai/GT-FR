@@ -36,12 +36,12 @@ A JSP-based web application that serves as the central hub for the face recognit
 - **Cloud Services**: 
   - Firebase Cloud Messaging (FCM) for push notifications
   - Google Cloud Storage for image storage
-- **Web Server**: Apache Tomcat 8.5
+- **Web Server**: Apache Tomcat 11 (Jakarta Servlet)
 - **Libraries**: 
   - MySQL Connector
   - Google Cloud Storage SDK
   - Firebase SDK
-  - Apache Commons (FileUpload, Logging)
+  - Apache Commons (Logging)
   - JSON processing libraries
 
 #### Key API Endpoints
@@ -99,8 +99,8 @@ The system uses MySQL with the following main tables:
 #### Setup Instructions
 
 1. **Prerequisites:**
-   - Java JDK 8 or higher
-   - Apache Tomcat 8.5 or higher
+   - Java JDK 17 or higher (recommended for Tomcat 11)
+   - Apache Tomcat 11 (Jakarta Servlet)
    - MySQL 5.7 or higher
    - Eclipse IDE (for development)
 
@@ -112,14 +112,31 @@ The system uses MySQL with the following main tables:
 
 3. **Configuration:**
    - Update `MySQLConfig.java` with your database credentials
+   - Configure database connection via `server-app/WebContent/user_config.txt` (see `server-app/WebContent/user_config.example.txt`)
    - Place `FaceRecognition-966aee651648.json` (Google Cloud service account key) in the WebContent root
    - Configure Firebase API key in `PushNotifHelper.java`
-   - Update `user_config.txt` with database connection settings
+   - Update `user_config.txt` with database connection settings (on the server: inside the deployed `/FRServer/` webapp folder)
 
-4. **Deployment:**
-   - Export the project as WAR file from Eclipse
-   - Deploy to Tomcat server
-   - Access via `http://localhost:8080/FDRServer/`
+4. **Tomcat 11 migration steps (Eclipse)**
+   - **Install WTP**: Use an Eclipse package that includes *Enterprise Java / Web Tools (WTP)*. If Tomcat 11 is not available in the runtime list, install “Eclipse Enterprise Java and Web Developer Tools”.
+   - **Add Tomcat 11 runtime**: `Window → Preferences → Server → Runtime Environments → Add… → Apache Tomcat v11.0`.
+   - **Attach runtime to project**: Right-click `server-app` → `Properties → Targeted Runtimes` → select **Tomcat 11**.
+   - **Update facets**: Right-click `server-app` → `Properties → Project Facets`:
+     - **Dynamic Web Module**: **6.0**
+     - **Java**: **17** (or whatever your Tomcat 11 JVM is)
+   - **Clean build**: `Project → Clean…` then `Project → Build All`.
+   - **Export WAR**: Right-click `server-app` → `Export… → Web → WAR file` (recommended WAR name: `FRServer.war`).
+
+5. **Deployment (Tomcat 11)**
+   - Copy the generated `FRServer.war` to Tomcat’s `webapps/` folder
+   - Restart Tomcat
+   - Test:
+     - `http://localhost:8088/FRServer/` (login page)
+     - `http://localhost:8088/FRServer/LogIn` (servlet mapping should not be 404)
+
+6. **Tomcat 8 legacy branch (optional)**
+   - If you need Tomcat 8 / Java 8 compatibility, use the `tomcat8-legacy` branch.
+   - Tomcat 8 uses `javax.servlet.*`; Tomcat 11 uses `jakarta.servlet.*` and is not backwards compatible.
 
 #### JSP Pages
 

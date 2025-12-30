@@ -29,7 +29,7 @@ import jakarta.servlet.http.Part;
 
 import org.json.JSONObject;
 
-import com.mysql.jdbc.MySQLConnection;
+import java.sql.Connection;
 import ucf.fdrssutil.MySQLConfig;
 import ucf.fdrssutil.globalUtil;
 
@@ -108,7 +108,7 @@ public class AgentPhotoUpload extends HttpServlet {
 						e.printStackTrace();
 					}
 					
-				MySQLConnection con=MySQLConfig.getConnection();
+				Connection con=MySQLConfig.getConnection();
 				PreparedStatement pstmt;
 				String query = "INSERT INTO person_info (name,sex,birthday,home,email,phone,person_img, feature, average) VALUES (?,?,?,?,?,?,?,?,?)";
 				pstmt = con.prepareStatement(query);

@@ -27,8 +27,7 @@ import jakarta.servlet.http.HttpSession;
 
 import org.json.JSONObject;
 
-import com.mysql.jdbc.MySQLConnection;
-
+import java.sql.Connection;
 import sun.misc.BASE64Decoder;
 import ucf.fdrssutil.MySQLConfig;
 import ucf.fdrssutil.globalUtil;
@@ -39,7 +38,7 @@ import ucf.fdrssutil.globalUtil;
 @WebServlet("/RegisterFromUser")
 public class RegisterFromUser extends HttpServlet {
 	private static final long serialVersionUID = 1L;
-	private MySQLConnection con;
+	private Connection con;
 	Format formatter = new SimpleDateFormat("yyyy-MM-dd");
 	private String root_path = "";
     /**

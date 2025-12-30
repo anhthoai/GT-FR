@@ -42,9 +42,7 @@ import jakarta.servlet.http.Part;
 
 import org.json.JSONObject;
 
-import com.mysql.jdbc.Driver;
-import com.mysql.jdbc.MySQLConnection;
-
+import java.sql.Connection;
 import ucf.fdrssutil.MySQLConfig;
 import ucf.fdrssutil.globalUtil;
 
@@ -56,7 +54,7 @@ import ucf.fdrssutil.globalUtil;
 public class UpdateDatabase extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	private String m_rootDir, m_fileDir;
-	private MySQLConnection con;
+	private Connection con;
 	Format formatter = new SimpleDateFormat("yyyy-MM-dd");
 
 	private int m_maxFileSize = 10*1024 * 1024;

@@ -35,9 +35,7 @@ import jakarta.servlet.http.HttpServletResponse;
 
 import org.json.JSONObject;
 
-import com.mysql.jdbc.Driver;
-import com.mysql.jdbc.MySQLConnection;
-
+import java.sql.Connection;
 import ucf.fdrssutil.MySQLConfig;
 import ucf.fdrssutil.globalUtil;
 
@@ -48,7 +46,7 @@ import ucf.fdrssutil.globalUtil;
 public class PersonSearch extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	private String m_rootDir, m_fileDir;
-	private MySQLConnection con;
+	private Connection con;
 	Format formatter = new SimpleDateFormat("yyyy-MM-dd");
 	byte[] search_imgbytes;
 	public PersonSearch() {

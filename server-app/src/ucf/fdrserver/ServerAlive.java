@@ -18,13 +18,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.json.*;
 
-import com.mysql.jdbc.MySQLConnection;
-
+import java.sql.Connection;
 import ucf.fdrssutil.MySQLConfig;
 @WebServlet("/ServerAlive")
 public class ServerAlive extends HttpServlet {
 	Format formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-	private MySQLConnection con;
+	private Connection con;
 	public ServerAlive() {
 		super();        
 	}

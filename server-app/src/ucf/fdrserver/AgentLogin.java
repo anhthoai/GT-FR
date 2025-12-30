@@ -14,8 +14,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import com.mysql.jdbc.MySQLConnection;
-
+import java.sql.Connection;
 import ucf.fdrssutil.MySQLConfig;
 import ucf.fdrssutil.globalUtil;
 
@@ -27,7 +26,7 @@ import org.json.*;
 @WebServlet("/AgentLogin")
 public class AgentLogin extends HttpServlet {
 	public static Logger m_logger = Logger.getLogger(MySQLConfig.class);
-	private MySQLConnection con;
+	private Connection con;
     /**
      * @see HttpServlet#HttpServlet()
      */

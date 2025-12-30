@@ -1,15 +1,15 @@
-# Troubleshooting Guide - 404 Error on CloudPanel/Nginx
+# Troubleshooting Guide - Tomcat 11 (Jakarta) Migration
 
-## Problem: 404 Not Found when accessing `/FRServer/LogIn` on VPS
+## Problem: 404 Not Found when accessing `/FRServer/LogIn`
 
 ### Quick Diagnosis Steps
 
 1. **Test Tomcat directly:**
    ```bash
-   curl -v http://localhost:8080/FRServer/
-   curl -v http://localhost:8080/FRServer/LogIn
+   curl -v http://localhost:8088/FRServer/
+   curl -v http://localhost:8088/FRServer/LogIn
    ```
-   If this works, the issue is with Nginx configuration.
+   If `/FRServer/` works but `/FRServer/LogIn` returns 404, that strongly indicates a servlet registration issue.
 
 2. **Check Tomcat is running:**
    ```bash
@@ -18,52 +18,25 @@
    ps aux | grep tomcat
    ```
 
-3. **Check Nginx error logs:**
-   ```bash
-   sudo tail -f /var/log/nginx/error.log
-   ```
-
-4. **Verify context path:**
+3. **Verify context path:**
    - WAR file should be named `FRServer.war` or deployed to `/FRServer` context
    - Check: `/opt/tomcat/webapps/FRServer/` exists
 
 ### Common Solutions
 
-#### Solution 1: Fix Nginx Proxy Configuration
+#### Tomcat 11 / Jakarta note (very common 404 root cause)
 
-Add to your CloudPanel Nginx config:
+If you are running **Tomcat 10.1 / 11** and you see **404** on servlet URLs (e.g. `/FRServer/LogIn`) while `index.jsp` works, the most common cause is a **Jakarta mismatch**:
 
-```nginx
-upstream tomcat_backend {
-    server 127.0.0.1:8080;
-}
+- **Tomcat 8/9** expects servlets compiled against `javax.servlet.*`
+- **Tomcat 10.1/11** expects servlets compiled against `jakarta.servlet.*`
 
-location /FRServer/ {
-    proxy_pass http://tomcat_backend/FRServer/;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_http_version 1.1;
-    proxy_set_header Connection "";
-    proxy_buffering off;
-}
-```
+If the WAR was built with `javax.servlet.*` but deployed to Tomcat 11, the servlet annotations are not registered and Tomcat returns **404**.
 
-#### Solution 2: Case Sensitivity Issue
+Fix:
+- Use the Tomcat 11 compatible branch (`main`) and export a fresh WAR from Eclipse after setting **Dynamic Web Module 6.0**.
 
-The servlet is mapped as `/LogIn` (capital L, I). Nginx might be case-sensitive.
-
-**Fix A:** Add case-insensitive rewrite:
-```nginx
-location ~* ^/FRServer/(login|Login|LOGIN)$ {
-    rewrite ^/FRServer/(.*)$ /FRServer/LogIn permanent;
-}
-```
-
-**Fix B:** Code has been updated to accept both `/LogIn` and `/login`
-
-#### Solution 3: Context Path Mismatch
+#### Solution 1: Context Path Mismatch
 
 Verify your WAR file name matches the context:
 ```bash
@@ -74,11 +47,11 @@ ls -la /opt/tomcat/webapps/
 # If you see: FDRServer/ or ROOT/, that's the problem
 ```
 
-#### Solution 4: Tomcat Not Binding to Localhost
+#### Solution 2: Tomcat Not Binding to Localhost
 
 Edit `/opt/tomcat/conf/server.xml`:
 ```xml
-<Connector port="8080" address="127.0.0.1" ... />
+<Connector port="8088" address="127.0.0.1" ... />
 ```
 
 Then restart:
@@ -86,47 +59,15 @@ Then restart:
 sudo systemctl restart tomcat
 ```
 
-### Step-by-Step Fix for CloudPanel
-
-1. **Access CloudPanel:**
-   - Log in to CloudPanel web interface
-   - Navigate to your site (java.goldtek.vn)
-
-2. **Add Nginx Configuration:**
-   - Go to "Nginx Configuration" or "Advanced Settings"
-   - Add the configuration from `cloudpanel-nginx-config.txt`
-   - Save changes
-
-3. **Test Configuration:**
-   ```bash
-   sudo nginx -t
-   ```
-
-4. **Reload Nginx:**
-   ```bash
-   sudo systemctl reload nginx
-   ```
-
-5. **Verify:**
-   - Access: `http://java.goldtek.vn/FRServer/`
-   - Should show login page
-   - Try: `http://java.goldtek.vn/FRServer/LogIn` (POST request)
-
 ### Testing Commands
 
 ```bash
 # Test 1: Direct Tomcat access
-curl -I http://localhost:8080/FRServer/
+curl -I http://localhost:8088/FRServer/
 
-# Test 2: Through Nginx
-curl -I http://java.goldtek.vn/FRServer/
-
-# Test 3: Check if servlet responds
-curl -X POST http://localhost:8080/FRServer/LogIn \
+# Test 2: Check if servlet responds
+curl -X POST http://localhost:8088/FRServer/LogIn \
   -d "userid=admin&password=test"
-
-# Test 4: Check Nginx proxy
-curl -v http://java.goldtek.vn/FRServer/LogIn
 ```
 
 ### Expected Results
@@ -139,7 +80,7 @@ curl -v http://java.goldtek.vn/FRServer/LogIn
 1. **Firewall:**
    ```bash
    sudo ufw status
-   # Ensure port 80, 443, and 8080 (if needed) are open
+   # Ensure Tomcat port (e.g. 8088) is reachable from where you are testing (or only localhost if behind a proxy)
    ```
 
 2. **SELinux (if enabled):**
@@ -160,8 +101,7 @@ curl -v http://java.goldtek.vn/FRServer/LogIn
 
 ### Still Not Working?
 
-1. Check if CloudPanel has specific requirements
-2. Verify Tomcat version compatibility
-3. Check if there's a reverse proxy already configured
-4. Review CloudPanel documentation for custom Nginx configs
+1. Verify you exported the WAR from the **Tomcat 11 compatible codebase** (Jakarta) and redeployed.
+2. Check Tomcat logs for deployment/classloading errors.
+3. Verify your servlet mappings exist (Tomcat should list them at startup if debug logging enabled).
 

@@ -16,8 +16,7 @@ import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
-import com.mysql.jdbc.MySQLConnection;
-
+import java.sql.Connection;
 import ucf.fdrssutil.MySQLConfig;
 import ucf.fdrssutil.globalUtil;
 
@@ -30,7 +29,7 @@ import org.json.*;
 public class LogIn extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	public static Logger m_logger = Logger.getLogger(MySQLConfig.class);
-	private MySQLConnection con;
+	private Connection con;
 	public static String  root_path="";
 	public static String personimgdir="";
     /**
@@ -84,13 +83,15 @@ public class LogIn extends HttpServlet {
 			deviceID = Integer.parseInt(strMobile);
 		
     	
+		PrintWriter out = response.getWriter();
     	MySQLConfig.userinfo_path = root_path + "user_config.txt";
     	con = MySQLConfig.getConnection();  
     	if (con == null){
     		m_logger.debug("Failed to connect to MySQL database!");
+    		response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+    		out.print("db_fail");
+    		return;
     	}
-		
-		PrintWriter out = response.getWriter();
 		try {
 			Statement stmt = con.createStatement();
 			String sql = "select * from users_info where userid='"+userid+"'";//+"' and password="+password;

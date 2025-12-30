@@ -32,9 +32,7 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONObject;
 
-import com.mysql.jdbc.Driver;
-import com.mysql.jdbc.MySQLConnection;
-
+import java.sql.Connection;
 import ucf.firebase.FirebaseResponse;
 import ucf.firebase.Notification;
 import ucf.firebase.PushNotifHelper;
@@ -48,8 +46,7 @@ import com.drew.metadata.Metadata;
 import com.drew.metadata.MetadataException;
 import com.drew.metadata.exif.ExifIFD0Directory;
 import com.drew.metadata.jpeg.JpegDirectory;
-import com.mysql.jdbc.MySQLConnection;
-
+import java.sql.Connection;
 import com.google.cloud.storage.Acl;
 import com.google.cloud.storage.Acl.Role;
 import com.google.cloud.storage.Acl.User;
@@ -73,7 +70,7 @@ import java.util.Map;
 public class SaveToDatabase extends HttpServlet {
 	private static final long serialVersionUID = 1L;
 	private String m_rootDir, m_fileDir;
-	private MySQLConnection con;
+	private Connection con;
 	Format formatter = new SimpleDateFormat("yyyy-MM-dd hh-mm-ss");
 
 	private int m_maxFileSize = 10*1024 * 1024;

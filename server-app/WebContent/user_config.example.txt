@@ -1,0 +1,9 @@
+db_url=jdbc:mysql://localhost:3306/
+db_name=frdssdata
+mysql_user=frdssdata
+mysql_password=frdssdata
+similarity threshold=50
+enablelog=0
+install=1
+
+

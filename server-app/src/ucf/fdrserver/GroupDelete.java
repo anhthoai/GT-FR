@@ -19,8 +19,7 @@ import jakarta.servlet.http.HttpSession;
 
 import org.json.JSONObject;
 
-import com.mysql.jdbc.MySQLConnection;
-
+import java.sql.Connection;
 import ucf.fdrssutil.MySQLConfig;
 import ucf.fdrssutil.globalUtil;
 
@@ -28,7 +27,7 @@ import ucf.fdrssutil.globalUtil;
 public class GroupDelete extends HttpServlet {
 	String root_path="";
 
-	private MySQLConnection con;
+	private Connection con;
 	public GroupDelete() {
         super();       
     }

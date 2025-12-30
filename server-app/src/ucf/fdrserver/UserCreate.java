@@ -19,15 +19,14 @@ import jakarta.servlet.http.HttpSession;
 
 import org.json.JSONObject;
 
-import com.mysql.jdbc.MySQLConnection;
-
+import java.sql.Connection;
 import ucf.fdrssutil.MySQLConfig;
 import ucf.fdrssutil.globalUtil;
 
 @WebServlet("/UserCreate")
 public class UserCreate extends HttpServlet {
 	String root_path="";
-	private MySQLConnection con;
+	private Connection con;
 	public UserCreate() {
         super();       
     }
