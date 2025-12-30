@@ -120,16 +120,30 @@ public class SaveToDatabase extends HttpServlet {
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		
 		response.setCharacterEncoding("UTF-8");
+		// Refresh connection (servlet may live long; DB can drop idle connections)
+		con = MySQLConfig.getConnection();
+
 		String adminid = request.getParameter("adminid");
 		String query = request.getParameter("query");
 		String alarm_id = request.getParameter("alarm_id");
 		String access = request.getParameter("access");
-		int verify_state = Integer.parseInt(request.getParameter("verify_state"));
-		int score = Integer.parseInt(request.getParameter("score"));
+
+		int verify_state = 0;
+		String verifyStateParam = request.getParameter("verify_state");
+		if (verifyStateParam != null && !verifyStateParam.isEmpty()) {
+			try { verify_state = Integer.parseInt(verifyStateParam); } catch (NumberFormatException ignored) {}
+		}
+
+		int score = 0;
+		String scoreParam = request.getParameter("score");
+		if (scoreParam != null && !scoreParam.isEmpty()) {
+			try { score = Integer.parseInt(scoreParam); } catch (NumberFormatException ignored) {}
+		}
+
 		String name = request.getParameter("name");
 		String sex = request.getParameter("sex");
 		String birthday = request.getParameter("birthday");
-		if (birthday.equals(""))
+		if (birthday == null || birthday.equals(""))
 			birthday = "1900-01-01";
 		String home_address = request.getParameter("home_address");
 		String email = request.getParameter("email");
@@ -137,12 +151,26 @@ public class SaveToDatabase extends HttpServlet {
 		String country = request.getParameter("country");
 		String group_name = request.getParameter("group_name");
 		String to_push = request.getParameter("to_push");
+		if (to_push == null || to_push.isEmpty()) to_push = "0";
+
+		// Use server-defined insert SQL if client doesn't provide one.
+		if (query == null || query.trim().isEmpty()) {
+			query = "INSERT INTO alarm_info (alarm_id,access,verify_state, score,name, sex, birthday, home_address, city, country, email, phone, adminid, group_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+		}
+
+		if (adminid == null) adminid = "";
+		if (alarm_id == null) alarm_id = "";
+		if (access == null) access = "";
 
 		String[] parts = access.split(" ");
+		if (parts.length < 2) {
+			// Fallback to avoid crashing on malformed access time.
+			parts = new String[] { "unknown-date", "00:00:00.000" };
+		}
 		String access_date = parts[0]; // 004
 		
 		String[] parts1 = parts[1].split(":");
-		String access_time = parts1[0] + "-" + parts1[1] + "-" + parts1[2];
+		String access_time = (parts1.length >= 3) ? (parts1[0] + "-" + parts1[1] + "-" + parts1[2]) : "00-00-00.000";
 		
 		String phone = request.getParameter("phone");
 		File img_f = new File(historyimgdir);
@@ -174,7 +202,7 @@ public class SaveToDatabase extends HttpServlet {
  		    out.print(obj);
  		    return;
         }
-		if (to_push.equals("1"))
+		if ("1".equals(to_push))
 		{
 			device_lists.clear();
 	    	String sql = "select * from device_lists where adminid='" + adminid + "'";
