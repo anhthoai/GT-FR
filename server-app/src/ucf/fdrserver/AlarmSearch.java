@@ -21,6 +21,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.Base64;
 
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
@@ -42,7 +43,6 @@ import ucf.fdrssutil.globalUtil;
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
-import sun.misc.BASE64Decoder;
 
 
 /**
@@ -166,7 +166,11 @@ public class AlarmSearch extends HttpServlet {
 		}
 		
 		
-		int verify_status=Integer.parseInt(request.getParameter("verify_state"));
+		int verify_status=0;
+		String verifyStateParam = request.getParameter("verify_state");
+		if (verifyStateParam != null && !verifyStateParam.isEmpty()) {
+			try { verify_status = Integer.parseInt(verifyStateParam); } catch (NumberFormatException ignored) {}
+		}
 		if (verify_status == 1)
 		{
 			if(sql!="") sql+=" AND verify_state='"+verify_status+"'";
@@ -196,8 +200,9 @@ public class AlarmSearch extends HttpServlet {
     	con = MySQLConfig.getConnection();
     	
     	String member=(String) request.getParameter("member");
+    	if (member == null) member = "";
     	String adminid = "";
-		if (!member.equals("agent"))
+		if (!"agent".equals(member))
 		{
 			try {
 				String query = "select * from users_info where userid='"+userid+"'";
@@ -220,7 +225,7 @@ public class AlarmSearch extends HttpServlet {
 			}
 		}
 		
-		if(adminid!=""){
+		if(adminid != null && !adminid.isEmpty()){
 			if(sql!="") sql+=" AND adminid='"+adminid.trim()+"'";
 			else sql="adminid='"+adminid.trim() + "'";
 		}
@@ -355,8 +360,8 @@ public class AlarmSearch extends HttpServlet {
 							        line = br.readLine();
 							    }
 							    String everything = sb.toString();
-							    BASE64Decoder decoder = new BASE64Decoder();
-								byte[] imageByte = decoder.decodeBuffer(everything);
+								String sanitized = everything.replaceAll("\\s+", "");
+								byte[] imageByte = Base64.getDecoder().decode(sanitized);
 								image_path=personimgdir+"/" + access_date + "_" + alarm_id + "_" + access_time + "_" + adminid + "_detected.jpg";
 								//if (!img_f.exists()){
 									DataOutputStream dos = globalUtil.getOutputStream(image_path);
@@ -393,8 +398,8 @@ public class AlarmSearch extends HttpServlet {
 							        line = br.readLine();
 							    }
 							    String everything = sb.toString();
-							    BASE64Decoder decoder = new BASE64Decoder();
-								byte[] imageByte = decoder.decodeBuffer(everything);
+								String sanitized = everything.replaceAll("\\s+", "");
+								byte[] imageByte = Base64.getDecoder().decode(sanitized);
 								image_path=personimgdir+"/" + access_date + "_" + alarm_id + "_" + access_time + "_" + adminid + "_recognized.jpg";
 								//if (!img_f.exists()){
 									DataOutputStream dos = globalUtil.getOutputStream(image_path);
@@ -430,8 +435,8 @@ public class AlarmSearch extends HttpServlet {
 							        line = br.readLine();
 							    }
 							    String everything = sb.toString();
-							    BASE64Decoder decoder = new BASE64Decoder();
-								byte[] imageByte = decoder.decodeBuffer(everything);
+								String sanitized = everything.replaceAll("\\s+", "");
+								byte[] imageByte = Base64.getDecoder().decode(sanitized);
 								image_path=personimgdir+"/" + access_date + "_" + alarm_id + "_" + access_time + "_" + adminid + "_full.jpg";
 								//if (!img_f.exists()){
 									DataOutputStream dos = globalUtil.getOutputStream(image_path);
