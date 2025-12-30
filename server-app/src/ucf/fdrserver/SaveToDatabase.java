@@ -95,7 +95,8 @@ public class SaveToDatabase extends HttpServlet {
     	MySQLConfig.userinfo_path=m_rootDir+"user_config.txt";
     	con = MySQLConfig.getConnection();
     	SERVICE_ACCOUNT_JSON_PATH = m_rootDir + "/FaceRecognition-966aee651648.json";//"D:\\My2019Work\\VietnamThoaiWork\\FDRServer\\FaceRecognition-966aee651648.json";
-    	//storage = StorageOptions.getDefaultInstance().getService();
+    	// IMPORTANT: GCS libs in WEB-INF/lib have historical version conflicts.
+    	// We must not fail servlet init() just because cloud upload isn't available.
     	try {
 			storage =
 				    StorageOptions.newBuilder()
@@ -104,12 +105,10 @@ public class SaveToDatabase extends HttpServlet {
 				                new FileInputStream(SERVICE_ACCOUNT_JSON_PATH)))
 				        .build()
 				        .getService();
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		} catch (Throwable t) {
+			// Includes NoSuchMethodError from dependency mismatch.
+			storage = null;
+			LogIn.m_logger.warn("[SaveToDatabase] Cloud Storage init failed; continuing without GCS upload.", t);
 		}
     	
 	}
@@ -202,7 +201,7 @@ public class SaveToDatabase extends HttpServlet {
  		    out.print(obj);
  		    return;
         }
-		if ("1".equals(to_push))
+		if ("1".equals(to_push) && storage != null)
 		{
 			device_lists.clear();
 	    	String sql = "select * from device_lists where adminid='" + adminid + "'";
@@ -286,6 +285,11 @@ public class SaveToDatabase extends HttpServlet {
 				response.getWriter().append("Notification sent!!!").append(request.getContextPath());
 				//***********************************
 	    	}
+		}
+		else if ("1".equals(to_push) && storage == null)
+		{
+			// Don't fail DB insert if GCS isn't available.
+			LogIn.m_logger.warn("[SaveToDatabase] to_push=1 but Cloud Storage is not initialized; skipping upload/push.");
 		}
 				
 		m_file = new File( image_path + alarm_id + "_" + access_time + "_" + adminid + "_recognized.encode");
