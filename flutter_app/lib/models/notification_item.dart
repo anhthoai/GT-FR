@@ -1,5 +1,6 @@
 class NotificationItem {
   final int? id;
+  final String eventId;
   final String name;
   final String time;
   final String group;
@@ -8,6 +9,7 @@ class NotificationItem {
 
   NotificationItem({
     this.id,
+    required this.eventId,
     required this.name,
     required this.time,
     required this.group,
@@ -17,6 +19,7 @@ class NotificationItem {
 
   Map<String, Object?> toMap() => {
         'id': id,
+        'event_id': eventId,
         'name': name,
         'time': time,
         'grp': group,
@@ -27,6 +30,7 @@ class NotificationItem {
   static NotificationItem fromMap(Map<String, Object?> m) {
     return NotificationItem(
       id: (m['id'] as int?),
+      eventId: (m['event_id'] as String?) ?? '',
       name: (m['name'] as String?) ?? '',
       time: (m['time'] as String?) ?? '',
       group: (m['grp'] as String?) ?? '',

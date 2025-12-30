@@ -12,9 +12,21 @@ This replaces the legacy `mobile-app/` Android-only project with a **Flutter** a
   - A local notification
   - An in-app **Inbox** with image + name/time/group
 
-## Android setup (uses existing Firebase project)
+## Firebase setup (recommended: FlutterFire CLI)
 
-This repo already includes `android/app/google-services.json` copied from the old Android app.
+This project is configured to use the **FlutterFire CLI** generated `lib/firebase_options.dart`.
+
+From `flutter_app/` run:
+
+```bash
+dart pub global activate flutterfire_cli
+flutterfire configure --project=gt-face-notify
+```
+
+This generates/updates:
+- `flutter_app/lib/firebase_options.dart`
+- `flutter_app/android/app/google-services.json`
+- (for iOS) you still need `GoogleService-Info.plist` in Xcode (see below)
 
 Run:
 

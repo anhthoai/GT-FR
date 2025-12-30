@@ -1,0 +1,1 @@
+{"flutter":{"platforms":{"android":{"default":{"projectId":"gt-face-notify","appId":"1:577076615632:android:f924dfc56c168ca20981d5","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"gt-face-notify","configurations":{"android":"1:577076615632:android:f924dfc56c168ca20981d5","ios":"1:577076615632:ios:ba0aa0ab18298ae30981d5"}}}}}}

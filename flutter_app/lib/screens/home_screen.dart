@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 
 import '../models/notification_item.dart';
 import '../services/fcm_service.dart';
+import '../services/notifications_service.dart';
 import '../storage/app_prefs.dart';
 import '../storage/notification_db.dart';
+import 'image_viewer_screen.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,11 +21,18 @@ class _HomeScreenState extends State<HomeScreen> {
   String _serverUrl = '';
   String _adminId = '';
   List<NotificationItem> _items = const [];
+  late final StreamSubscription<void> _dbSub;
 
   @override
   void initState() {
     super.initState();
     _refreshAll();
+    _dbSub = NotificationDb.instance.changes.listen((_) {
+      _refreshAll();
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationsService.instance.requestPermissionIfNeeded();
+    });
   }
 
   Future<void> _refreshAll() async {
@@ -45,10 +55,16 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
+  void dispose() {
+    _dbSub.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('GT-FR Notifications'),
+        title: const Text('GT-Face Notify'),
         actions: [
           IconButton(
             onPressed: _openSettings,
@@ -131,19 +147,44 @@ class _NotificationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final heroTag = 'notif_img_${item.eventId}';
+    final title = [
+      if (item.group.isNotEmpty) '[${item.group}]',
+      if (item.name.isNotEmpty) item.name else 'Unknown',
+    ].join(' ');
+
     return Card(
       child: ListTile(
         leading: item.imageUrl.isEmpty
             ? const CircleAvatar(child: Icon(Icons.person))
-            : ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Image.network(
-                  item.imageUrl,
-                  width: 56,
-                  height: 56,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
-                      const SizedBox(width: 56, height: 56, child: Icon(Icons.broken_image)),
+            : GestureDetector(
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => ImageViewerScreen(
+                        imageUrl: item.imageUrl,
+                        title: title.isEmpty ? 'Image' : title,
+                        heroTag: heroTag,
+                      ),
+                    ),
+                  );
+                },
+                child: Hero(
+                  tag: heroTag,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: Image.network(
+                      item.imageUrl,
+                      width: 56,
+                      height: 56,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => const SizedBox(
+                        width: 56,
+                        height: 56,
+                        child: Icon(Icons.broken_image),
+                      ),
+                    ),
+                  ),
                 ),
               ),
         title: Text(item.name.isEmpty ? 'Unknown' : item.name),

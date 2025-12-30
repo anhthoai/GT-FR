@@ -1,25 +1,14 @@
 package ucf.fdrserver;
 
 import java.io.*;
-import java.awt.AlphaComposite;
-import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.Image;
-import java.awt.RenderingHints;
-import java.awt.image.BufferedImage;
-import java.sql.Blob;
-import java.sql.Date;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.Format;
 import java.text.SimpleDateFormat;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Base64;
 
-import javax.imageio.ImageIO;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -32,12 +21,11 @@ import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
 import org.json.JSONObject;
 
-import java.sql.Connection;
 import ucf.firebase.FirebaseResponse;
 import ucf.firebase.Notification;
 import ucf.firebase.PushNotifHelper;
+import ucf.firebase.FcmV1Client;
 import ucf.fdrssutil.MySQLConfig;
-import ucf.fdrssutil.globalUtil;
 
 import com.drew.imaging.ImageMetadataReader;
 import com.drew.imaging.ImageProcessingException;
@@ -58,7 +46,6 @@ import com.google.auth.oauth2.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 
@@ -69,12 +56,12 @@ import java.util.Map;
 @WebServlet("/SaveToDatabase")
 public class SaveToDatabase extends HttpServlet {
 	private static final long serialVersionUID = 1L;
-	private String m_rootDir, m_fileDir;
+	private String m_rootDir;
 	private Connection con;
 	Format formatter = new SimpleDateFormat("yyyy-MM-dd hh-mm-ss");
 
-	private int m_maxFileSize = 10*1024 * 1024;
-	private int m_maxMemSize = 1*1024 * 1024;
+	// legacy field kept for compatibility with older code paths (unused now)
+	@SuppressWarnings("unused")
 	private File m_file;
 	
 	byte[] imgbytes;
@@ -89,7 +76,6 @@ public class SaveToDatabase extends HttpServlet {
 	}
 	public void init( ){
 		m_rootDir = getServletContext().getRealPath("/");
-		m_fileDir = m_rootDir+"data/";
 		historyimgdir = m_rootDir+"historyimgs/";
 		
     	MySQLConfig.userinfo_path=m_rootDir+"user_config.txt";
@@ -111,6 +97,55 @@ public class SaveToDatabase extends HttpServlet {
 			LogIn.m_logger.warn("[SaveToDatabase] Cloud Storage init failed; continuing without GCS upload.", t);
 		}
     	
+	}
+
+	private static String buildBaseUrl(HttpServletRequest request) {
+		// Respect reverse proxy headers if present (common for HTTPS frontends)
+		String proto = request.getHeader("X-Forwarded-Proto");
+		if (proto == null || proto.isEmpty()) proto = request.getScheme();
+
+		String host = request.getHeader("X-Forwarded-Host");
+		if (host == null || host.isEmpty()) host = request.getHeader("Host");
+		if (host == null || host.isEmpty()) host = request.getServerName();
+
+		// If Host already includes port, keep it.
+		if (host.contains(":")) {
+			return proto + "://" + host;
+		}
+
+		int port = request.getServerPort();
+		String xfPort = request.getHeader("X-Forwarded-Port");
+		if (xfPort != null && !xfPort.isEmpty()) {
+			try { port = Integer.parseInt(xfPort.trim()); } catch (NumberFormatException ignored) {}
+		}
+
+		// Common reverse-proxy case: TLS is terminated upstream (443) but Tomcat sees 80 internally.
+		// If we're building an https URL and we see port=80 with no forwarded port, treat it as default (omit).
+		if ("https".equalsIgnoreCase(proto) && port == 80 && (xfPort == null || xfPort.isEmpty())) {
+			port = 443;
+		}
+
+		boolean defaultPort = ("http".equalsIgnoreCase(proto) && port == 80) || ("https".equalsIgnoreCase(proto) && port == 443);
+		return proto + "://" + host + (defaultPort ? "" : (":" + port));
+	}
+
+	private static boolean writeEncodeAndJpg(String encodedBase64, String encodePath, String jpgPath) {
+		try {
+			if (encodedBase64 == null) return false;
+			try (FileWriter fw = new FileWriter(new File(encodePath))) {
+				fw.write(encodedBase64);
+			}
+			String sanitized = encodedBase64.replaceAll("\\s+", "");
+			if (sanitized.isEmpty()) return false;
+			byte[] imageBytes = Base64.getDecoder().decode(sanitized);
+			try (FileOutputStream fos = new FileOutputStream(jpgPath)) {
+				fos.write(imageBytes);
+			}
+			return true;
+		} catch (Throwable t) {
+			System.out.println("[SaveToDatabase] Failed to write encode/jpg: " + t);
+			return false;
+		}
 	}
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
 		// TODO Auto-generated method stub
@@ -151,6 +186,7 @@ public class SaveToDatabase extends HttpServlet {
 		String group_name = request.getParameter("group_name");
 		String to_push = request.getParameter("to_push");
 		if (to_push == null || to_push.isEmpty()) to_push = "0";
+		System.out.println("[SaveToDatabase] request adminid=" + adminid + " group=" + group_name + " to_push=" + to_push);
 
 		// Use server-defined insert SQL if client doesn't provide one.
 		if (query == null || query.trim().isEmpty()) {
@@ -186,142 +222,29 @@ public class SaveToDatabase extends HttpServlet {
 		String json_str="";
 		PreparedStatement pstmt;
 		
-		m_file = new File( image_path + alarm_id + "_" + access_time + "_" + adminid + "_detected" + ".encode");
+		String fileBase = alarm_id + "_" + access_time + "_" + adminid;
+		String detectedEncodePath = image_path + fileBase + "_detected.encode";
+		String recognizedEncodePath = image_path + fileBase + "_recognized.encode";
+		String fullEncodePath = image_path + fileBase + "_full.encode";
+		String detectedJpgPath = image_path + fileBase + "_detected.jpg";
+		String recognizedJpgPath = image_path + fileBase + "_recognized.jpg";
+		String fullJpgPath = image_path + fileBase + "_full.jpg";
+
 		String encoded_string = request.getParameter("detected");
-		try {
-            FileWriter fw = new FileWriter(m_file);
-            fw.write(encoded_string);
-            fw.close();
-
-        } catch (IOException iox) {
-            //do stuff with exception
-            iox.printStackTrace();
-            String strJson = "{result : fail}";
- 		    JSONObject obj = new JSONObject(strJson);
- 		    out.print(obj);
- 		    return;
-        }
-		if ("1".equals(to_push) && storage != null)
-		{
-			device_lists.clear();
-	    	String sql = "select * from device_lists where adminid='" + adminid + "'";
-	    	try {
-				Statement stmt = con.createStatement();
-				ResultSet rs = stmt.executeQuery(sql);
-				while (rs.next()==true){
-					String token = rs.getString("token");
-					device_lists.add(token);
-				}
-			} catch (SQLException e) {
-				e.printStackTrace();
-			} catch (org.json.JSONException e){
-				e.printStackTrace();	
-			}
-	    	if (device_lists.size() > 0)
-	    	{
-	    		//********** push notification********
-				Notification notification = new Notification();
-				for (int i = 0 ; i < device_lists.size(); i++)
-				{
-					notification.addDeviceToSend(device_lists.get(i));
-				}
-				
-				notification.setTitle("FRResult");
-				notification.setMessageBody("recognition result");
-
-				BufferedReader br = new BufferedReader(new FileReader(image_path + alarm_id + "_" + access_time + "_" + adminid + "_detected" + ".encode"));
-				try {
-				    StringBuilder sb = new StringBuilder();
-				    String line = br.readLine();
-
-				    while (line != null) {
-				        sb.append(line);
-				        sb.append(System.lineSeparator());
-				        line = br.readLine();
-				    }
-				    String everything = sb.toString();
-				    // remove whitespace/newlines before decoding
-				    String sanitized = everything.replaceAll("\\s+", "");
-					byte[] imageByte = Base64.getDecoder().decode(sanitized);
-					//if (!img_f.exists()){
-						DataOutputStream dos = globalUtil.getOutputStream(image_path + "/temp.jpg");
-						dos.write(imageByte);
-						dos.close();
-					//}
-				} finally {
-				    br.close();
-				}
-				
-				InputStream is = new FileInputStream(image_path + "/temp.jpg");
-			    ByteArrayOutputStream os = new ByteArrayOutputStream();
-			    byte[] readBuf = new byte[4096];
-			    while (is.available() > 0) {
-			      int bytesRead = is.read(readBuf);
-			      os.write(readBuf, 0, bytesRead);
-			    }
-				// [START storageHelper]
-			    //CloudStorageHelper storageHelper = new CloudStorageHelper();
-				DateTimeFormatter dtf = DateTimeFormat.forPattern("-YYYY-MM-dd-HHmmssSSS");
-			    DateTime dt = DateTime.now(DateTimeZone.UTC);
-			    String dtString = dt.toString(dtf);
-				BlobInfo blobInfo =
-				        storage.create(
-				            BlobInfo
-				                .newBuilder("gt-face-notify.appspot.com", "image" + dtString + ".jpg")
-				                // Modify access list to allow all users with link to read file
-				                .setAcl(new ArrayList<>(Arrays.asList(Acl.of(User.ofAllUsers(), Role.READER))))
-				                .build(),
-				                os.toByteArray());
-				String image_url = blobInfo.getMediaLink();
-				notification.addDataAttribute("image", image_url); // custom data payload
-				notification.addDataAttribute("time", access); // custom data payload
-				notification.addDataAttribute("name", name); // custom data payload
-				notification.addDataAttribute("group", group_name); // custom data payload
-
-				FirebaseResponse fr = new PushNotifHelper().sendNotificationToDevice(notification);
-				System.out.println(fr.getErrorMessage());
-				System.out.println(fr.getFCMResponseCode());
-				System.out.println(fr.getSuccessMessage());
-				response.getWriter().append("Notification sent!!!").append(request.getContextPath());
-				//***********************************
-	    	}
+		if (!writeEncodeAndJpg(encoded_string, detectedEncodePath, detectedJpgPath)) {
+			String strJson = "{result : fail}";
+			JSONObject obj = new JSONObject(strJson);
+			out.print(obj);
+			return;
 		}
-		else if ("1".equals(to_push) && storage == null)
-		{
-			// Don't fail DB insert if GCS isn't available.
-			LogIn.m_logger.warn("[SaveToDatabase] to_push=1 but Cloud Storage is not initialized; skipping upload/push.");
-		}
+		// (push happens later, after we have written *_recognized and *_full)
 				
-		m_file = new File( image_path + alarm_id + "_" + access_time + "_" + adminid + "_recognized.encode");
 		encoded_string = request.getParameter("recognized");
-		try {
-            FileWriter fw = new FileWriter(m_file);
-            fw.write(encoded_string);
-            fw.close();
+		// For unknown faces, "recognized" may be empty; still create file if possible.
+		writeEncodeAndJpg(encoded_string, recognizedEncodePath, recognizedJpgPath);
 
-        } catch (IOException iox) {
-            //do stuff with exception
-            iox.printStackTrace();
-            String strJson = "{result : fail}";
- 		    JSONObject obj = new JSONObject(strJson);
- 		    out.print(obj);
- 		    return;
-        }
-		m_file = new File( image_path + alarm_id + "_" + access_time + "_" + adminid + "_full.encode");
 		encoded_string = request.getParameter("full");
-		try {
-            FileWriter fw = new FileWriter(m_file);
-            fw.write(encoded_string);
-            fw.close();
-
-        } catch (IOException iox) {
-            //do stuff with exception
-            iox.printStackTrace();
-            String strJson = "{result : fail}";
- 		    JSONObject obj = new JSONObject(strJson);
- 		    out.print(obj);
- 		    return;
-        }
+		writeEncodeAndJpg(encoded_string, fullEncodePath, fullJpgPath);
 		try {
 			pstmt = con.prepareStatement(query);
 			
@@ -343,6 +266,137 @@ public class SaveToDatabase extends HttpServlet {
 			pstmt.setString(13, adminid);
 			pstmt.setString(14, group_name);
 			pstmt.executeUpdate();
+
+			// Push notification AFTER successful save so we can include the "recognized" image.
+			if ("1".equals(to_push))
+			{
+				adminid = adminid == null ? "" : adminid.trim();
+
+				// Load tokens and de-duplicate (some DBs may contain duplicate rows)
+				java.util.LinkedHashSet<String> tokenSet = new java.util.LinkedHashSet<>();
+		    	String sql = "select token from device_lists where adminid='" + adminid + "'";
+		    	try {
+					Statement stmt = con.createStatement();
+					ResultSet rs = stmt.executeQuery(sql);
+					while (rs.next()==true){
+						String token = rs.getString("token");
+						if (token != null) {
+							token = token.trim();
+							if (!token.isEmpty()) tokenSet.add(token);
+						}
+					}
+				} catch (SQLException e) {
+					e.printStackTrace();
+				}
+
+				ArrayList<String> tokens = new ArrayList<>(tokenSet);
+				System.out.println("[SaveToDatabase] Push requested. adminid=" + adminid
+						+ " group=" + group_name
+						+ " tokens=" + tokens.size()
+						+ " storage=" + (storage != null)
+						+ " verify_state=" + verify_state);
+
+		    	if (tokens.size() > 0)
+		    	{
+					final String safeGroup = group_name == null ? "" : group_name.trim();
+					final String safeName = name == null ? "" : name.trim();
+					final String notifTitle =
+							(safeGroup.isEmpty() ? "" : ("[" + safeGroup + "] "))
+									+ (safeName.isEmpty() ? "Unknown" : safeName);
+					final String notifBody = (access == null ? "" : access.trim());
+
+					Map<String, String> dataPayload = new HashMap<>();
+					dataPayload.put("time", access == null ? "" : access);
+					dataPayload.put("name", safeName);
+					dataPayload.put("group", safeGroup);
+					dataPayload.put("image", "");
+					dataPayload.put("alarm_id", alarm_id == null ? "" : alarm_id);
+
+					// Prefer local JPG URL (more reliable than GCS).
+					String baseUrl = buildBaseUrl(request);
+					String relDir = "historyimgs/" + access_date + "/";
+					String chosenRel = relDir + fileBase + (verify_state == 1 ? "_recognized.jpg" : "_detected.jpg");
+					String localUrl = baseUrl + request.getContextPath() + "/" + chosenRel;
+					File chosenFile = new File(image_path + fileBase + (verify_state == 1 ? "_recognized.jpg" : "_detected.jpg"));
+					if (chosenFile.exists() && chosenFile.length() > 0) {
+						dataPayload.put("image", localUrl);
+						System.out.println("[SaveToDatabase] image(local)=" + localUrl + " bytes=" + chosenFile.length());
+					} else {
+						System.out.println("[SaveToDatabase] image(local) missing file=" + chosenFile.getAbsolutePath());
+					}
+
+					// Upload image to GCS if available (use recognized image for verify_state=1)
+					if (storage != null) {
+						try {
+							String encodePath =
+									image_path + alarm_id + "_" + access_time + "_" + adminid
+											+ (verify_state == 1 ? "_recognized.encode" : "_detected.encode");
+
+							BufferedReader br = new BufferedReader(new FileReader(encodePath));
+							try {
+							    StringBuilder sb = new StringBuilder();
+							    String line = br.readLine();
+							    while (line != null) {
+							        sb.append(line);
+							        sb.append(System.lineSeparator());
+							        line = br.readLine();
+							    }
+							    String everything = sb.toString();
+							    String sanitized = everything.replaceAll("\\s+", "");
+								byte[] imageByte = Base64.getDecoder().decode(sanitized);
+
+								ByteArrayOutputStream os = new ByteArrayOutputStream();
+								os.write(imageByte);
+
+								DateTimeFormatter dtf = DateTimeFormat.forPattern("-YYYY-MM-dd-HHmmssSSS");
+							    DateTime dt = DateTime.now(DateTimeZone.UTC);
+							    String dtString = dt.toString(dtf);
+							    String objectName = "image" + dtString + ".jpg";
+								storage.create(
+								            BlobInfo
+								                .newBuilder("gt-face-notify.appspot.com", objectName)
+								                .setAcl(new ArrayList<>(Arrays.asList(Acl.of(User.ofAllUsers(), Role.READER))))
+								                .build(),
+								                os.toByteArray());
+								String image_url = "https://storage.googleapis.com/gt-face-notify.appspot.com/" + objectName;
+								// Keep localUrl as default, but if GCS works we can also prefer it.
+								dataPayload.put("image", image_url);
+							} finally {
+							    br.close();
+							}
+						} catch (Throwable t) {
+							System.out.println("[SaveToDatabase] GCS upload failed (continuing without image): " + t);
+						}
+					}
+
+					boolean sentOk = false;
+					try {
+						FcmV1Client v1 = FcmV1Client.fromServiceAccountJsonPath(SERVICE_ACCOUNT_JSON_PATH);
+						int okCount = 0;
+						for (String token : tokens) {
+							FcmV1Client.SendResult r = v1.sendToToken(token, notifTitle, notifBody, dataPayload);
+							System.out.println("[SaveToDatabase] FCM v1 token=" + token + " http=" + r.httpCode + " err=" + r.errorBody);
+							if (r.httpCode >= 200 && r.httpCode < 300) okCount++;
+						}
+						System.out.println("[SaveToDatabase] FCM v1 okCount=" + okCount + " total=" + tokens.size());
+						sentOk = okCount > 0;
+					} catch (Throwable t) {
+						System.out.println("[SaveToDatabase] FCM v1 send failed: " + t);
+					}
+
+					if (!sentOk) {
+						Notification notification = new Notification();
+						for (String token : tokens) notification.addDeviceToSend(token);
+						notification.setTitle(notifTitle);
+						notification.setMessageBody(notifBody);
+						for (Map.Entry<String, String> e : dataPayload.entrySet()) notification.addDataAttribute(e.getKey(), e.getValue());
+						FirebaseResponse fr = new PushNotifHelper().sendNotificationToDevice(notification);
+						System.out.println("[SaveToDatabase] Legacy FCM http=" + fr.getFCMResponseCode()
+								+ " ok=" + fr.getSuccessMessage()
+								+ " err=" + fr.getErrorMessage());
+					}
+		    	}
+			}
 			
 			
 			json_str="{'result' : 'ok'}";
@@ -361,32 +415,7 @@ public class SaveToDatabase extends HttpServlet {
 		}
 		
 	}
-	 private static String encodeFileToBase64Binary(File file){
-         String encodedfile = null;
-         try {
-             FileInputStream fileInputStreamReader = new FileInputStream(file);
-             byte[] bytes = new byte[(int)file.length()];
-             fileInputStreamReader.read(bytes);
-             encodedfile = Base64.getEncoder().encodeToString(bytes);
-         } catch (FileNotFoundException e) {
-             // TODO Auto-generated catch block
-             e.printStackTrace();
-         } catch (IOException e) {
-             // TODO Auto-generated catch block
-             e.printStackTrace();
-         }
-
-         return encodedfile;
-     }
-	 
-	 private static BufferedImage resizeImage(BufferedImage originalImage, int type, int IMG_WIDTH, int IMG_HEIGHT) {
-		    BufferedImage resizedImage = new BufferedImage(IMG_WIDTH, IMG_HEIGHT, type);
-		    Graphics2D g = resizedImage.createGraphics();
-		    g.drawImage(originalImage, 0, 0, IMG_WIDTH, IMG_HEIGHT, null);
-		    g.dispose();
-
-		    return resizedImage;
-		}
+	 // (unused legacy helpers removed)
 		
 		// Inner class containing image information
 		public static class ImageInformation {

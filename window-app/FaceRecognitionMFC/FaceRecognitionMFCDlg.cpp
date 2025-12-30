@@ -1008,6 +1008,10 @@ UINT CFaceRecognitionMFCDlg::thread_recognition(LPVOID param)
 
 			if (result == "fail" || result == "none")
 			{
+				// Unknown face: align server payload/group filtering to "Unregistered"
+				// so push config like "VIP Unregistered ..." works and mobile displays a meaningful group.
+				tmp_group = "Unregistered";
+
 				CImage image;
 				cv::resize(cropped, cropped, Size(100, 100));
 				Mat extended_mat = Mat(140, 200, CV_8UC3, cv::Scalar(0, 0, 0));
@@ -1052,23 +1056,30 @@ UINT CFaceRecognitionMFCDlg::thread_recognition(LPVOID param)
 				{
 					http::Request save_request(save_server_url);																		  // pass parameters as a map
 					std::map<std::string, std::string> save_parameters;
-					if (std::find(group_lists.begin(), group_lists.end(), "Unregistered") != group_lists.end())
-					{
+					
+					// Decide whether to push:
+					// - If no groups configured, default to push
+					// - Unknown faces map to group "Unregistered"
+					auto containsGroup = [&](const std::string& g) -> bool {
+						for (const auto& x : group_lists) {
+							if (x == g) return true;
+						}
+						return false;
+					};
+					std::string pushGroup = "Unregistered";
+					bool shouldPush = group_lists.size() == 0 || containsGroup("All") || containsGroup("*") || containsGroup(pushGroup);
+					std::string to_push = shouldPush ? "1" : "0";
+
 						save_parameters = { { "alarm_id", temp.alarm_id },{ "access", temp.access },{ "verify_state", "0" },{ "score", "0" },
-						{ "name", tmp_name },{ "sex", tmp_sex },{ "birthday", tmp_birthday },{ "home_address", tmp_home },{ "email", tmp_email },{ "to_push", "1" },
+					{ "name", tmp_name },{ "sex", tmp_sex },{ "birthday", tmp_birthday },{ "home_address", tmp_home },{ "email", tmp_email },{ "to_push", to_push },
 						{ "phone", tmp_phone },{ "query", query },{ "adminid", ts->_this->mAdminID },{ "city", tmp_city },{ "group_name", tmp_group },{ "country", tmp_country },{ "detected", encoded_face_img },{ "recognized", encoded_verify_img },{ "full", encoded_full_img } };
-					}
-					else
-					{
-						save_parameters = { { "alarm_id", temp.alarm_id },{ "access", temp.access },{ "verify_state", "0" },{ "score", "0" },
-						{ "name", tmp_name },{ "sex", tmp_sex },{ "birthday", tmp_birthday },{ "home_address", tmp_home },{ "email", tmp_email },{ "to_push", "0" },
-						{ "phone", tmp_phone },{ "query", query },{ "adminid", ts->_this->mAdminID },{ "city", tmp_city },{ "group_name", tmp_group },{ "country", tmp_country },{ "detected", encoded_face_img },{ "recognized", encoded_verify_img },{ "full", encoded_full_img } };
-					}
 					
 					const http::Response save_response = save_request.send("POST", save_parameters, {
 						"Content-Type: application/x-www-form-urlencoded"
 					});
-					std::string save_result = jsonObject["result"];
+					std::string saveResultString = std::string(save_response.body.begin(), save_response.body.end());
+					json::jobject saveJson = json::jobject::parse(saveResultString);
+					std::string save_result = saveJson["result"];
 					if (save_result == "fail")
 					{
 						continue;
@@ -1161,22 +1172,28 @@ UINT CFaceRecognitionMFCDlg::thread_recognition(LPVOID param)
 				{
 					http::Request save_request(save_server_url);																		  // pass parameters as a map
 					std::map<std::string, std::string> save_parameters;
-					if (std::find(group_lists.begin(), group_lists.end(), tmp_group) != group_lists.end())
-					{
+					
+					// Decide whether to push:
+					// - If no groups configured, default to push
+					// - Push if the recognized person's group is in configured list
+					auto containsGroup = [&](const std::string& g) -> bool {
+						for (const auto& x : group_lists) {
+							if (x == g) return true;
+						}
+						return false;
+					};
+					bool shouldPush = group_lists.size() == 0 || containsGroup("All") || containsGroup("*") || containsGroup(tmp_group);
+					std::string to_push = shouldPush ? "1" : "0";
+
 						save_parameters = { { "alarm_id", temp.alarm_id },{ "access", temp.access },{ "verify_state", "1" },{ "score", to_string(match_score) },
-						{ "name", tmp_name },{ "sex", tmp_sex },{ "birthday", tmp_birthday },{ "home_address", tmp_home },{ "email", tmp_email },{ "to_push", "1" },
+					{ "name", tmp_name },{ "sex", tmp_sex },{ "birthday", tmp_birthday },{ "home_address", tmp_home },{ "email", tmp_email },{ "to_push", to_push },
 						{ "phone", tmp_phone },{ "query", query },{ "adminid", ts->_this->mAdminID },{ "city", tmp_city },{ "group_name", tmp_group },{ "country", tmp_country },{ "detected", encoded_face_img },{ "recognized", res_img_string },{ "full", encoded_full_img } };
-					}
-					else
-					{
-						save_parameters = { { "alarm_id", temp.alarm_id },{ "access", temp.access },{ "verify_state", "1" },{ "score", to_string(match_score) },
-						{ "name", tmp_name },{ "sex", tmp_sex },{ "birthday", tmp_birthday },{ "home_address", tmp_home },{ "email", tmp_email },{ "to_push", "0" },
-						{ "phone", tmp_phone },{ "query", query },{ "adminid", ts->_this->mAdminID },{ "city", tmp_city },{ "group_name", tmp_group },{ "country", tmp_country },{ "detected", encoded_face_img },{ "recognized", res_img_string },{ "full", encoded_full_img } };
-					}
 					const http::Response save_response = save_request.send("POST", save_parameters, {
 						"Content-Type: application/x-www-form-urlencoded"
 					});
-					std::string save_result = jsonObject["result"];
+					std::string saveResultString = std::string(save_response.body.begin(), save_response.body.end());
+					json::jobject saveJson = json::jobject::parse(saveResultString);
+					std::string save_result = saveJson["result"];
 					if (save_result == "fail")
 					{
 						continue;

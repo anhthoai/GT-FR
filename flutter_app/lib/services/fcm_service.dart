@@ -1,14 +1,77 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/widgets.dart';
 
 import '../models/notification_item.dart';
 import '../storage/notification_db.dart';
 import '../storage/app_prefs.dart';
 import 'notifications_service.dart';
 import 'server_api.dart';
+import '../firebase_options.dart';
+
+String _buildEventId(RemoteMessage message) {
+  final d = message.data;
+  final alarmId = (d['alarm_id'] ?? '').toString();
+  final time = (d['time'] ?? '').toString();
+  if (alarmId.isNotEmpty && time.isNotEmpty) {
+    return 'alarm:$alarmId|$time';
+  }
+  final mid = message.messageId;
+  if (mid != null && mid.isNotEmpty) return 'mid:$mid';
+  // Last resort: hash-like stable string for this payload
+  final name = (d['name'] ?? '').toString();
+  final group = (d['group'] ?? '').toString();
+  final image = (d['image'] ?? '').toString();
+  return 'p:$time|$group|$name|$image';
+}
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Keep background handler minimal. The app will show stored events when opened.
+  // This MUST handle data-only messages while the app is backgrounded/killed.
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  await NotificationsService.instance.init();
+
+  final data = message.data;
+  final name = (data['name'] ?? '').toString();
+  final time = (data['time'] ?? '').toString();
+  final group = (data['group'] ?? '').toString();
+  final image = (data['image'] ?? '').toString();
+
+  try {
+    if (name.isNotEmpty || time.isNotEmpty || group.isNotEmpty || image.isNotEmpty) {
+      await NotificationDb.instance.insert(
+        NotificationItem(
+          eventId: _buildEventId(message),
+          name: name,
+          time: time,
+          group: group,
+          imageUrl: image,
+          receivedAt: DateTime.now(),
+        ),
+      );
+    }
+  } catch (e) {
+    // ignore: avoid_print
+    print('[FCM] background DB insert failed: $e');
+  }
+
+  final title = [
+    if (group.isNotEmpty) '[$group]',
+    if (name.isNotEmpty) name else 'Unknown',
+  ].join(' ');
+
+  await NotificationsService.instance.showBigPicture(
+    title: (data['title'] ?? '').toString().trim().isNotEmpty
+        ? (data['title'] ?? '').toString()
+        : (title.isEmpty ? 'FRResult' : title),
+    body: (data['body'] ?? '').toString().trim().isNotEmpty
+        ? (data['body'] ?? '').toString()
+        : (time.isNotEmpty ? time : 'Face recognition event'),
+    imageUrl: image,
+  );
 }
 
 class FcmService {
@@ -70,21 +133,36 @@ class FcmService {
     final group = (data['group'] ?? '').toString();
     final image = (data['image'] ?? '').toString();
 
-    if (name.isNotEmpty || time.isNotEmpty || group.isNotEmpty || image.isNotEmpty) {
-      await NotificationDb.instance.insert(
-        NotificationItem(
-          name: name,
-          time: time,
-          group: group,
-          imageUrl: image,
-          receivedAt: DateTime.now(),
-        ),
-      );
+    try {
+      if (name.isNotEmpty || time.isNotEmpty || group.isNotEmpty || image.isNotEmpty) {
+        await NotificationDb.instance.insert(
+          NotificationItem(
+            eventId: _buildEventId(message),
+            name: name,
+            time: time,
+            group: group,
+            imageUrl: image,
+            receivedAt: DateTime.now(),
+          ),
+        );
+      }
+    } catch (e) {
+      NotificationsService.instance.log('[FCM] foreground DB insert failed: $e');
     }
 
+    final title = [
+      if (group.isNotEmpty) '[$group]',
+      if (name.isNotEmpty) name else 'Unknown',
+    ].join(' ');
+
     await NotificationsService.instance.showBigPicture(
-      title: name.isEmpty ? 'FRResult' : name,
-      body: [time, group].where((s) => s.isNotEmpty).join(' • '),
+      title: (data['title'] ?? '').toString().trim().isNotEmpty
+          ? (data['title'] ?? '').toString()
+          : (title.isEmpty ? 'FRResult' : title),
+      body: (data['body'] ?? '').toString().trim().isNotEmpty
+          ? (data['body'] ?? '').toString()
+          : (time.isNotEmpty ? time : 'Face recognition event'),
+      imageUrl: image,
     );
   }
 
