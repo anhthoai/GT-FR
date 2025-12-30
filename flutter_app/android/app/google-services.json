@@ -1,0 +1,50 @@
+{
+  "project_info": {
+    "project_number": "577076615632",
+    "firebase_url": "https://gt-face-notify.firebaseio.com",
+    "project_id": "gt-face-notify",
+    "storage_bucket": "gt-face-notify.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:577076615632:android:f924dfc56c168ca20981d5",
+        "android_client_info": {
+          "package_name": "vn.com.goldtek.facenotify"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "577076615632-etupudnc6rjb1j60ap6r2mq5qg1mvttk.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "vn.com.goldtek.facenotify",
+            "certificate_hash": "d078f309d89d7972386c37fac0cd33f47e93856b"
+          }
+        },
+        {
+          "client_id": "577076615632-du202i1up19ltfc9cspa44rs80u7emti.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBf6hB2fBMKhtC_UoZmsPCx3BmbBd2XnnE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "577076615632-du202i1up19ltfc9cspa44rs80u7emti.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+
+
