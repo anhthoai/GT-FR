@@ -4110,6 +4110,7 @@ void CFaceRecognitionMFCDlg::OnBnClickedSetting()
 		ofstream fs1;
 		fs1.open(outfile);
 		fs1 << "adminid=" << mAdminID << endl;
+		fs1 << "server_url=" << mServerURL << endl;
 		std::string group_lists = "";
 		for (int i = 0; i < settingDlg.getGroupName().size(); i++)
 		{

@@ -83,9 +83,6 @@ BOOL LogInDlg::OnInitDialog()
 		}
 	}
 
-	mServerURL = _T("http://localhost:8080/FDRServer/");
-	UpdateData(FALSE);
-
 	char chRootDir[MAX_PATH];
 	GetModuleFileName(NULL, chRootDir, MAX_PATH);
 	char *p = strrchr(chRootDir, '\\');
@@ -115,6 +112,8 @@ BOOL LogInDlg::OnInitDialog()
 	ReleaseDC(screenDC);
 
 	admin_config = std::string(chRootDir) + "/config.txt";
+	// Default server URL (used if config.txt doesn't contain server_url)
+	mServerURL = _T("http://localhost:8080/FDRServer/");
 	if (!file_exists(admin_config))
 	{
 		mAdminID = "";
@@ -132,6 +131,14 @@ BOOL LogInDlg::OnInitDialog()
 			{
 				mAdminID = read_line.substr(read_line.find(delimiter) + 1, read_line.length() - read_line.find(delimiter));
 			}
+			else if (key == "server_url")
+			{
+				std::string url = read_line.substr(read_line.find(delimiter) + 1, read_line.length() - read_line.find(delimiter));
+				if (url.size() > 0)
+				{
+					mServerURL = CString(url.c_str());
+				}
+			}
 			else if (key == "groupToPush")
 			{
 				std::string group_str = read_line.substr(read_line.find(delimiter) + 1, read_line.length() - read_line.find(delimiter));
@@ -147,6 +154,7 @@ BOOL LogInDlg::OnInitDialog()
 		}
 
 	}
+	UpdateData(FALSE);
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -209,6 +217,7 @@ void LogInDlg::OnBnClickedLogIn()
 				ofstream fs1;
 				fs1.open(outfile);
 				fs1 << "adminid=" << admin_id << endl;
+				fs1 << "server_url=" << server_url << endl;
 				if (mAdminID != admin_id)
 				{
 					MessageBox("You are different admin. Please set group to push notification!", "Warning!", MB_OK | MB_ICONQUESTION);
